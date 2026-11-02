@@ -88,14 +88,22 @@ def make_predictions(df: pd.DataFrame):
     return result_df
 
 
+# --------------------------------------------------
+# Results Display
+# --------------------------------------------------
+
 def display_results(result_df: pd.DataFrame):
     """Display prediction results and download functionality."""
 
     total_records = len(result_df)
 
-    anomalies = (result_df["Prediction"] == "anomaly").sum()
+    anomalies = (
+        result_df["Prediction"] == "anomaly"
+    ).sum()
 
-    normal = (result_df["Prediction"] == "normal").sum()
+    normal = (
+        result_df["Prediction"] == "normal"
+    ).sum()
 
     col1, col2, col3 = st.columns(3)
 
@@ -122,6 +130,129 @@ def display_results(result_df: pd.DataFrame):
         mime="text/csv",
         use_container_width=True
     )
+
+
+# --------------------------------------------------
+# Anomaly Characteristics Visualization
+# --------------------------------------------------
+
+def display_anomaly_characteristics(result_df: pd.DataFrame):
+    """
+    Analyze and visualize the mean feature values
+    of anomalous records compared with normal records.
+
+    Args:
+        result_df: DataFrame containing the original features
+                   and their corresponding predictions.
+    """
+
+    st.divider()
+
+    st.header("🔍 Anomaly Characteristics Analysis")
+
+    st.write(
+        """
+        This section compares the average well-log measurements
+        of anomalous records against normal records.
+
+        It helps identify the main statistical differences
+        between the two groups.
+        """
+    )
+
+    # Separate anomalous and normal records
+
+    anomaly_df = result_df[
+        result_df["Prediction"] == "anomaly"
+    ]
+
+    normal_df = result_df[
+        result_df["Prediction"] == "normal"
+    ]
+
+    # Check available groups
+
+    if anomaly_df.empty:
+
+        st.warning(
+            "No anomalous records were detected. "
+            "There are no anomaly characteristics to analyze."
+        )
+
+        return
+
+    if normal_df.empty:
+
+        st.warning(
+            "All records were classified as anomalies. "
+            "A comparison with normal records is not possible."
+        )
+
+    # Calculate feature means
+
+    comparison_df = pd.DataFrame(
+        {
+            "Anomalies": anomaly_df[
+                list(FEATURE_COLUMNS)
+            ].mean(),
+
+            "Normal": normal_df[
+                list(FEATURE_COLUMNS)
+            ].mean()
+        }
+    )
+
+    # Display anomaly statistics
+
+    st.subheader("Mean Feature Values")
+
+    st.caption(
+        "Average measurement values for each group."
+    )
+
+    st.dataframe(
+        comparison_df,
+        use_container_width=True
+    )
+
+    # Display chart
+
+    st.subheader("Anomalies vs Normal Records")
+
+    st.bar_chart(
+        comparison_df,
+        x_label="Well Log Features",
+        y_label="Mean Value",
+        use_container_width=True
+    )
+
+    # Display the difference between groups
+
+    if not normal_df.empty:
+
+        st.subheader("Difference Between Both Groups")
+
+        difference_df = pd.DataFrame(
+            {
+                "Mean Difference": (
+                    comparison_df["Anomalies"]
+                    - comparison_df["Normal"]
+                )
+            }
+        )
+
+        st.bar_chart(
+            difference_df,
+            x_label="Well Log Features",
+            y_label="Difference in Mean",
+            use_container_width=True
+        )
+
+        st.caption(
+            "Positive values indicate higher average measurements "
+            "in anomalous records, while negative values indicate "
+            "lower average measurements."
+        )
 
 
 # --------------------------------------------------
@@ -233,10 +364,16 @@ with single_tab:
             prediction = result_df["Prediction"].iloc[0]
 
             if prediction == "normal":
-                st.success("The record is classified as NORMAL.")
+
+                st.success(
+                    "The record is classified as NORMAL."
+                )
 
             else:
-                st.error("The record is classified as ANOMALY.")
+
+                st.error(
+                    "The record is classified as ANOMALY."
+                )
 
         except Exception as e:
 
@@ -348,6 +485,7 @@ with multiple_tab:
                 ]
 
                 if len(parsed_data[feature]) != number_of_records:
+
                     raise ValueError(
                         f"{feature} must contain exactly "
                         f"{number_of_records} values."
@@ -415,7 +553,9 @@ with csv_tab:
 
             elif input_df.empty:
 
-                st.warning("The uploaded CSV file is empty.")
+                st.warning(
+                    "The uploaded CSV file is empty."
+                )
 
             else:
 
@@ -424,17 +564,35 @@ with csv_tab:
                     use_container_width=True
                 ):
 
-                    input_df = input_df.loc[
-                        :, FEATURE_COLUMNS
-                    ].copy()
+                    try:
 
-                    result_df = make_predictions(input_df)
+                        input_df = input_df.loc[
+                            :, FEATURE_COLUMNS
+                        ].copy()
 
-                    display_results(result_df)
+                        result_df = make_predictions(input_df)
+
+                        # Display predictions
+
+                        display_results(result_df)
+
+                        # Display anomaly analysis
+
+                        display_anomaly_characteristics(
+                            result_df
+                        )
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Prediction failed: {e}"
+                        )
 
         except Exception as e:
 
-            st.error(f"Error processing CSV file: {e}")
+            st.error(
+                f"Error processing CSV file: {e}"
+            )
 
 
 # --------------------------------------------------
